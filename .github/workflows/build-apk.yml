@@ -54,12 +54,12 @@ jobs:
       - name: Install Android build packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Build APK
+      - name: Build standalone release APK
         working-directory: app/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Rename APK
-        run: cp app/android/app/build/outputs/apk/debug/app-debug.apk Nagoo.apk
+        run: cp app/android/app/build/outputs/apk/release/app-release.apk Nagoo.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
