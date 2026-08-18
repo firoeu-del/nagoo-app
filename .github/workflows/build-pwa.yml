@@ -3,7 +3,7 @@ name: Build iPhone PWA for Cloudflare
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, agent/pwa-runtime-fix]
     paths:
       - "nagoo-source.zip"
       - "source-parts/**"
