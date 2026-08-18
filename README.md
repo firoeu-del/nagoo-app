@@ -1,7 +1,12 @@
-# نگو! — بازی دورهمی
+# نگو! — APK اندروید
 
-نسخه Expo/React Native بازی «نگو!» به‌همراه GitHub Actions برای ساخت خودکار APK اندروید.
+این مخزن نسخهٔ React Native/Expo بازی «نگو!» را با حفظ رابط، صداها و انیمیشن‌های اصلی به APK اندروید تبدیل می‌کند.
 
 ## دریافت APK
 
-از تب Actions، اجرای «Build Android APK» را باز کنید و artifact با نام `nagoo-android-apk` را دانلود کنید.
+1. وارد تب **Actions** شوید.
+2. اجرای **Build Android APK** را باز کنید.
+3. در بخش **Artifacts** فایل **nagoo-v1.37.1-android-apk** را دانلود کنید.
+4. ZIP دانلودشده را باز و فایل APK را روی گوشی نصب کنید.
+
+برای ساخت دوباره، از صفحهٔ workflow روی **Run workflow** بزنید.

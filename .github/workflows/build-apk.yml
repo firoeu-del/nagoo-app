@@ -4,8 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
+    paths:
+      - "nagoo-source.zip"
+      - "source-parts/**"
+      - "SOURCE_SHA256.txt"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -15,31 +21,44 @@ jobs:
   build-apk:
     name: Build installable APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+
+    env:
+      CI: "1"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
 
       - name: Extract app source
-        run: unzip -q nagoo-source.zip -d app
+        run: |
+          if [ -d source-parts ]; then
+            cat source-parts/nagoo-source.zip.part-* > nagoo-source.zip
+          fi
+          sha256sum --check SOURCE_SHA256.txt
+          mkdir -p app
+          unzip -q nagoo-source.zip -d app
+          test -f app/package-lock.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: app/package-lock.json
 
       - name: Install dependencies
         working-directory: app
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
-      - name: Generate Android project
+      - name: Validate TypeScript
         working-directory: app
-        env:
-          CI: "1"
-        run: npx expo prebuild --platform android --clean
+        run: npm run typecheck
+
+      - name: Generate native Android project
+        working-directory: app
+        run: npx expo prebuild --platform android --clean --no-install
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -52,19 +71,22 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android build packages
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
 
       - name: Build standalone release APK
         working-directory: app/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
-      - name: Rename APK
-        run: cp app/android/app/build/outputs/apk/release/app-release.apk Nagoo.apk
+      - name: Prepare APK
+        run: |
+          cp app/android/app/build/outputs/apk/release/app-release.apk Nagoo-v1.37.1.apk
+          test -s Nagoo-v1.37.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nagoo-android-apk
-          path: Nagoo.apk
+          name: nagoo-v1.37.1-android-apk
+          path: Nagoo-v1.37.1.apk
           if-no-files-found: error
           retention-days: 30
