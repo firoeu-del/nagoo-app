@@ -31,6 +31,7 @@ assert(files.includes('nagoo-icon-512.png'), 'iPhone home-screen icon is missing
 
 const index = await readFile(resolve(distRoot, 'index.html'), 'utf8');
 assert(index.includes('lang="fa" dir="rtl"'), 'Persian/RTL document metadata is missing.');
+assert(index.includes('viewport-fit=cover'), 'iPhone safe-area viewport support is missing.');
 assert(index.includes('apple-mobile-web-app-capable'), 'iPhone standalone metadata is missing.');
 assert(index.includes('/manifest.webmanifest'), 'Manifest link is missing from index.html.');
 assert(index.includes('/pwa-register.js'), 'Service-worker registration is missing from index.html.');

@@ -119,6 +119,16 @@ await writeFile(resolve(distRoot, 'pwa-register.js'), registerScript, 'utf8');
 const indexPath = resolve(distRoot, 'index.html');
 let indexHtml = await readFile(indexPath, 'utf8');
 indexHtml = indexHtml.replace(/<html(?:\s[^>]*)?>/i, '<html lang="fa" dir="rtl">');
+indexHtml = indexHtml.replace(
+  /(<meta\s+name="viewport"\s+content=")([^"]*)("\s*\/?>)/i,
+  (_match, prefix, content, suffix) => {
+    const values = content.split(',').map((value) => value.trim()).filter(Boolean);
+    if (!values.some((value) => value.toLowerCase().startsWith('viewport-fit='))) {
+      values.push('viewport-fit=cover');
+    }
+    return `${prefix}${values.join(', ')}${suffix}`;
+  },
+);
 
 const headMarkup = `
     <meta name="theme-color" content="#F8F3E8">
