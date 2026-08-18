@@ -1,0 +1,95 @@
+name: Build iPhone PWA for Cloudflare
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "nagoo-source.zip"
+      - "source-parts/**"
+      - "SOURCE_SHA256.txt"
+      - "pwa-tools/**"
+      - ".github/workflows/build-pwa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iphone-pwa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-pwa:
+    name: Build offline iPhone PWA
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CI: "1"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Extract app source
+        run: |
+          if [ -d source-parts ]; then
+            cat source-parts/nagoo-source.zip.part-* > nagoo-source.zip
+          fi
+          sha256sum --check SOURCE_SHA256.txt
+          mkdir -p app
+          unzip -q nagoo-source.zip -d app
+          test -f app/package-lock.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: app
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare web compatibility layer
+        run: |
+          node --check pwa-tools/prepare-source.mjs
+          node --check pwa-tools/finalize-dist.mjs
+          node --check pwa-tools/verify-dist.mjs
+          node pwa-tools/prepare-source.mjs app
+          npm install --prefix app --no-save --package-lock=false --no-audit --no-fund react-dom@19.2.3 react-native-web@~0.21.0 @expo/metro-runtime@~57.0.11
+
+      - name: Validate TypeScript
+        working-directory: app
+        run: npm run typecheck
+
+      - name: Export production web app
+        working-directory: app
+        run: npx expo export --platform web --output-dir dist --clear
+
+      - name: Add offline and iPhone PWA support
+        run: |
+          node pwa-tools/finalize-dist.mjs app/dist app
+          node --check app/dist/sw.js
+          node --check app/dist/pwa-register.js
+          node pwa-tools/verify-dist.mjs app/dist | tee pwa-verification.json
+
+      - name: Package Cloudflare upload ZIP
+        run: |
+          cd app/dist
+          zip -q -r ../../Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip .
+          cd ../..
+          unzip -t Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip
+          sha256sum Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip > Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip.sha256
+
+      - name: Upload PWA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nagoo-v1.37.1-iphone-pwa-cloudflare
+          path: |
+            Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip
+            Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip.sha256
+            pwa-verification.json
+          if-no-files-found: error
+          retention-days: 30
