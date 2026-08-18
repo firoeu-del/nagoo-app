@@ -129,7 +129,7 @@ try {
       const text = (document.body.innerText ?? '').trim();
       const controls = document.querySelectorAll('button, [role="button"]').length;
       return text.length >= 10 && controls >= 1;
-    }, { timeout: 20_000 });
+    }, undefined, { timeout: 20_000 });
   } catch (error) {
     failure = `Online UI stayed blank: ${error.message}`;
   }
@@ -149,7 +149,7 @@ try {
       await page.waitForFunction(async () => {
         const names = await caches.keys();
         return names.some((name) => name.startsWith('nagoo-pwa-'));
-      }, { timeout: 20_000 });
+      }, undefined, { timeout: 20_000 });
     } catch (error) {
       failure = `Offline cache was not installed: ${error.message}`;
     }
@@ -163,7 +163,7 @@ try {
         const text = (document.body.innerText ?? '').trim();
         const controls = document.querySelectorAll('button, [role="button"]').length;
         return text.length >= 10 && controls >= 1;
-      }, { timeout: 20_000 });
+      }, undefined, { timeout: 20_000 });
     } catch (error) {
       failure = `Offline reload stayed blank: ${error.message}`;
     }
