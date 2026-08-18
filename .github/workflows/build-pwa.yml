@@ -57,8 +57,9 @@ jobs:
           node --check pwa-tools/prepare-source.mjs
           node --check pwa-tools/finalize-dist.mjs
           node --check pwa-tools/verify-dist.mjs
+          node --check pwa-tools/runtime-smoke.mjs
           node pwa-tools/prepare-source.mjs app
-          npm install --prefix app --no-save --package-lock=false --no-audit --no-fund react-dom@19.2.3 react-native-web@~0.21.0 @expo/metro-runtime@~57.0.11
+          npm install --prefix app --no-save --package-lock=false --no-audit --no-fund react-dom@19.2.3 react-native-web@~0.21.0 @expo/metro-runtime@~57.0.11 playwright@1.55.0
 
       - name: Validate TypeScript
         working-directory: app
@@ -74,6 +75,24 @@ jobs:
           node --check app/dist/sw.js
           node --check app/dist/pwa-register.js
           node pwa-tools/verify-dist.mjs app/dist | tee pwa-verification.json
+
+      - name: Install browser for runtime testing
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+
+      - name: Test online and offline runtime
+        run: node pwa-tools/runtime-smoke.mjs app/dist app pwa-runtime-smoke.png
+
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nagoo-pwa-runtime-diagnostics
+          path: |
+            pwa-runtime-smoke.png
+            pwa-runtime-verification.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Package Cloudflare upload ZIP
         run: |
@@ -91,5 +110,6 @@ jobs:
             Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip
             Nagoo-v1.37.1-iPhone-PWA-Cloudflare.zip.sha256
             pwa-verification.json
+            pwa-runtime-verification.json
           if-no-files-found: error
           retention-days: 30
