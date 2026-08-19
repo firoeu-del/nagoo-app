@@ -49,6 +49,11 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Apply Android startup fix
+        run: |
+          node --check android-tools/prepare-source.mjs
+          node android-tools/prepare-source.mjs app
+
       - name: Install dependencies
         working-directory: app
         run: npm ci --no-audit --no-fund
