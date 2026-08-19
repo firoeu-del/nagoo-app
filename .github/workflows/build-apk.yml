@@ -3,11 +3,12 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, agent/android-startup-fix]
     paths:
       - "nagoo-source.zip"
       - "source-parts/**"
       - "SOURCE_SHA256.txt"
+      - "android-tools/**"
       - ".github/workflows/build-apk.yml"
 
 permissions:
@@ -19,7 +20,7 @@ concurrency:
 
 jobs:
   build-apk:
-    name: Build installable APK
+    name: Build and launch installable APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -82,11 +83,40 @@ jobs:
         run: |
           cp app/android/app/build/outputs/apk/release/app-release.apk Nagoo-v1.37.1.apk
           test -s Nagoo-v1.37.1.apk
+          sha256sum Nagoo-v1.37.1.apk > Nagoo-v1.37.1.apk.sha256
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch APK in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot-save
+          script: bash android-tools/runtime-smoke.sh Nagoo-v1.37.1.apk
+
+      - name: Upload Android runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nagoo-android-runtime-diagnostics
+          path: android-runtime-diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: nagoo-v1.37.1-android-apk
-          path: Nagoo-v1.37.1.apk
+          path: |
+            Nagoo-v1.37.1.apk
+            Nagoo-v1.37.1.apk.sha256
           if-no-files-found: error
           retention-days: 30
