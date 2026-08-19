@@ -58,6 +58,12 @@ jobs:
         working-directory: app
         run: npm ci --no-audit --no-fund
 
+      - name: Verify and snapshot the word database
+        run: |
+          npm run qa:words --prefix app
+          node --check android-tools/generate-word-snapshot.mjs
+          node android-tools/generate-word-snapshot.mjs app
+
       - name: Validate TypeScript
         working-directory: app
         run: npm run typecheck

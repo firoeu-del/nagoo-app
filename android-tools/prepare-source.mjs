@@ -8,6 +8,11 @@ let source = await readFile(appPath, 'utf8');
 
 const replacements = [
   {
+    label: 'eager word database import',
+    from: "import { words } from './src/data/words';",
+    to: "import { loadBuiltInWords } from './src/data/wordRuntime';",
+  },
+  {
     label: 'eager PNG decoder import',
     from: "import { decodeAllAppPngs } from './src/assets/imageAssets';\n",
     to: '',
@@ -39,6 +44,52 @@ const replacements = [
     from: '  const appReady = fontsLoaded && hydrated && imagesReady;',
     to: '  const appReady = startupFallbackReady || (fontsLoaded && hydrated);',
   },
+  {
+    label: 'built-in word state',
+    from: `  const [customWords, setCustomWords] = useState<CustomWord[]>([]);
+  const [hydrated, setHydrated] = useState(false);`,
+    to: `  const [customWords, setCustomWords] = useState<CustomWord[]>([]);
+  const [builtInWords, setBuiltInWords] = useState<GameWord[]>([]);
+  const [hydrated, setHydrated] = useState(false);`,
+  },
+  {
+    label: 'post-paint word database loader',
+    from: `  const [, setContentTelemetryRevision] = useState(0);
+
+  useEffect(() => {`,
+    to: `  const [, setContentTelemetryRevision] = useState(0);
+
+  useEffect(() => {
+    // Commit the lightweight home screen first, then hydrate the verified word
+    // snapshot on the next task. This avoids executing the 19,520-word database
+    // while Android is still creating the first React surface.
+    const timer = setTimeout(() => setBuiltInWords(loadBuiltInWords()), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {`,
+  },
+  {
+    label: 'built-in word memo source',
+    from: `  const allWords = useMemo<GameWord[]>(() => [
+    ...words,
+    ...customWords.map((word) => ({ ...word, category: 'custom' as const })),
+  ], [customWords]);`,
+    to: `  const allWords = useMemo<GameWord[]>(() => [
+    ...builtInWords,
+    ...customWords.map((word) => ({ ...word, category: 'custom' as const })),
+  ], [builtInWords, customWords]);`,
+  },
+  {
+    label: 'general word fallback source',
+    from: "    const fallback = words.filter((word) => word.category === 'general');",
+    to: "    const fallback = builtInWords.filter((word) => word.category === 'general');",
+  },
+  {
+    label: 'initial game word',
+    from: '  const [currentWord, setCurrentWord] = useState<GameWord>(() => words[0]);',
+    to: "  const [currentWord, setCurrentWord] = useState<GameWord>(() => ({ id: 'general-1', text: 'چتر', category: 'general', difficulty: 'normal' }));",
+  },
 ];
 
 for (const { label, from, to } of replacements) {
@@ -50,6 +101,53 @@ for (const { label, from, to } of replacements) {
 }
 
 await writeFile(appPath, source, 'utf8');
+
+const homePath = join(appRoot, 'src/screens/HomeScreen.tsx');
+let homeSource = await readFile(homePath, 'utf8');
+const homeReplacements = [
+  {
+    label: 'home word database import',
+    from: "import { words } from '../data/words';",
+    to: "import { HOME_PREVIEW_WORDS } from '../data/wordMeta';",
+  },
+  {
+    label: 'runtime home preview scan',
+    from: `const HOME_PREVIEW_CATEGORIES = ['general', 'cinema', 'sports', 'food', 'objects', 'places'] as const;
+const HOME_PREVIEW_WORDS = Array.from(
+  new Set([
+    'پرسپولیس',
+    ...HOME_PREVIEW_CATEGORIES.flatMap((category) =>
+      words
+        .filter((word) => word.category === category && word.difficulty === 'normal' && word.text.length <= 14)
+        .slice(0, 14)
+        .map((word) => word.text),
+    ),
+  ]),
+);
+`,
+    to: '',
+  },
+];
+
+for (const { label, from, to } of homeReplacements) {
+  const matches = homeSource.split(from).length - 1;
+  if (matches !== 1) {
+    throw new Error(`Expected exactly one ${label} match in ${homePath}; found ${matches}.`);
+  }
+  homeSource = homeSource.replace(from, to);
+}
+await writeFile(homePath, homeSource, 'utf8');
+
+for (const screenName of ['GameScreen.tsx', 'PacksScreen.tsx', 'ResultsScreen.tsx']) {
+  const screenPath = join(appRoot, 'src/screens', screenName);
+  const screenSource = await readFile(screenPath, 'utf8');
+  const from = "from '../data/words';";
+  const matches = screenSource.split(from).length - 1;
+  if (matches !== 1) {
+    throw new Error(`Expected exactly one word metadata import in ${screenPath}; found ${matches}.`);
+  }
+  await writeFile(screenPath, screenSource.replace(from, "from '../data/wordMeta';"), 'utf8');
+}
 
 const catalogPath = join(appRoot, 'src/data/wordHintCatalog.ts');
 const hintEnginePath = join(appRoot, 'src/game/hints.ts');
